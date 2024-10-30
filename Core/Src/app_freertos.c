@@ -117,24 +117,26 @@ void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN StartDefaultTask */
 	HAL_DAC_Start(&hdac1, DAC_CHANNEL_2);
-	HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_2, DAC_ALIGN_12B_R, 12*312); //Spannung einstellen
-	HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R, 0.125*625); //Strom einstellen
+	HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_2, DAC_ALIGN_12B_R, 0*312); //Spannung einstellen
+	HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R, 0*625); //Strom einstellen
 	HAL_DAC_Start(&hdac1, DAC_CHANNEL_1);
 
 
 	HAL_COMP_Start(&hcomp1);
 	HAL_COMP_Start(&hcomp2);
-	HAL_TIM_PWM_Start(&htim1, HAL_TIM_ACTIVE_CHANNEL_1);
 	HAL_TIM_PWM_Start(&htim1, HAL_TIM_ACTIVE_CHANNEL_2);
 	HAL_TIM_PWM_Start(&htim1, HAL_TIM_ACTIVE_CHANNEL_3);
-	HAL_TIM_PWM_Start(&htim1, HAL_TIM_ACTIVE_CHANNEL_4);
-	__HAL_TIM_SET_COMPARE(&htim1,HAL_TIM_ACTIVE_CHANNEL_1,120);
 	__HAL_TIM_SET_COMPARE(&htim1,HAL_TIM_ACTIVE_CHANNEL_2,120);
 	__HAL_TIM_SET_COMPARE(&htim1,HAL_TIM_ACTIVE_CHANNEL_3,120);
-	__HAL_TIM_SET_COMPARE(&htim1,HAL_TIM_ACTIVE_CHANNEL_4,120);
 
 	HAL_GPIO_TogglePin(GREEN_GPIO_Port, GREEN_Pin);
 	//osDelay(200);
+
+	for(float voltage = 0; voltage < 12; voltage +=0.05)
+	{
+		HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_2, DAC_ALIGN_12B_R, voltage*312);
+		osDelay(1);
+	}
 
   /* Infinite loop */
   for(;;)
