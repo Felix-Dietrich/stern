@@ -139,12 +139,12 @@ void StartDefaultTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-	  for(float current = 0.02; current < 0.5; current +=0.0005)
+	  for(float current = 0.1; current < 0.5; current +=0.0005)
 	  {
 		  HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R, current*625); //Strom einstellen
 		  osDelay(4);
 	  }
-	  for(float current = 0.5; current > 0.02; current -=0.0005)
+	  for(float current = 0.5; current > 0.1; current -=0.0005)
 	  {
 		  HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R, current*625); //Strom einstellen
 		  osDelay(4);

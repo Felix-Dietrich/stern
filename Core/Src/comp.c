@@ -43,9 +43,9 @@ void MX_COMP1_Init(void)
   hcomp1.Init.InputMinus = COMP_INPUT_MINUS_DAC1_CH1;
   hcomp1.Init.OutputPol = COMP_OUTPUTPOL_NONINVERTED;
   hcomp1.Init.WindowOutput = COMP_WINDOWOUTPUT_EACH_COMP;
-  hcomp1.Init.Hysteresis = COMP_HYSTERESIS_HIGH;
+  hcomp1.Init.Hysteresis = COMP_HYSTERESIS_NONE;
   hcomp1.Init.BlankingSrce = COMP_BLANKINGSRC_NONE;
-  hcomp1.Init.Mode = COMP_POWERMODE_MEDIUMSPEED;
+  hcomp1.Init.Mode = COMP_POWERMODE_HIGHSPEED;
   hcomp1.Init.WindowMode = COMP_WINDOWMODE_DISABLE;
   hcomp1.Init.TriggerMode = COMP_TRIGGERMODE_NONE;
   if (HAL_COMP_Init(&hcomp1) != HAL_OK)
@@ -73,9 +73,9 @@ void MX_COMP2_Init(void)
   hcomp2.Init.InputMinus = COMP_INPUT_MINUS_DAC1_CH2;
   hcomp2.Init.OutputPol = COMP_OUTPUTPOL_NONINVERTED;
   hcomp2.Init.WindowOutput = COMP_WINDOWOUTPUT_EACH_COMP;
-  hcomp2.Init.Hysteresis = COMP_HYSTERESIS_HIGH;
+  hcomp2.Init.Hysteresis = COMP_HYSTERESIS_NONE;
   hcomp2.Init.BlankingSrce = COMP_BLANKINGSRC_NONE;
-  hcomp2.Init.Mode = COMP_POWERMODE_MEDIUMSPEED;
+  hcomp2.Init.Mode = COMP_POWERMODE_HIGHSPEED;
   hcomp2.Init.WindowMode = COMP_WINDOWMODE_DISABLE;
   hcomp2.Init.TriggerMode = COMP_TRIGGERMODE_NONE;
   if (HAL_COMP_Init(&hcomp2) != HAL_OK)
