@@ -20,7 +20,6 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "stm32g0xx_it.h"
-#include "usbpd.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 /* USER CODE END Includes */
@@ -111,8 +110,6 @@ void UCPD1_2_IRQHandler(void)
   /* USER CODE BEGIN UCPD1_2_IRQn 0 */
 
   /* USER CODE END UCPD1_2_IRQn 0 */
-  USBPD_PORT0_IRQHandler();
-
   /* USER CODE BEGIN UCPD1_2_IRQn 1 */
 
   /* USER CODE END UCPD1_2_IRQn 1 */

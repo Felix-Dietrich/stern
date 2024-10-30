@@ -26,7 +26,6 @@
 #include "i2c.h"
 #include "tim.h"
 #include "ucpd.h"
-#include "usbpd.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -111,8 +110,6 @@ int main(void)
 
   /* Init scheduler */
   osKernelInitialize();
-  /* USBPD initialisation ---------------------------------*/
-  MX_USBPD_Init();
 
   /* Call init function for freertos objects (in cmsis_os2.c) */
   MX_FREERTOS_Init();
