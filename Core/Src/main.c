@@ -22,8 +22,11 @@
 #include "adc.h"
 #include "comp.h"
 #include "dac.h"
+#include "dma.h"
 #include "i2c.h"
 #include "tim.h"
+#include "ucpd.h"
+#include "usbpd.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -93,6 +96,7 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_I2C1_Init();
   MX_TIM1_Init();
   MX_ADC1_Init();
@@ -100,12 +104,15 @@ int main(void)
   MX_COMP2_Init();
   MX_DAC1_Init();
   MX_TIM2_Init();
+  MX_UCPD1_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
 
   /* Init scheduler */
   osKernelInitialize();
+  /* USBPD initialisation ---------------------------------*/
+  MX_USBPD_Init();
 
   /* Call init function for freertos objects (in cmsis_os2.c) */
   MX_FREERTOS_Init();
