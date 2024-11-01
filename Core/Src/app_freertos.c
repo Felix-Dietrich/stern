@@ -153,16 +153,11 @@ void StartDefaultTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-/*	  for(float current = 0.1; current < 0.5; current +=0.0005)
-	  {
-		  HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R, current*625); //Strom einstellen
-		  osDelay(4);
-	  }
-	  for(float current = 0.5; current > 0.1; current -=0.0005)
-	  {
-		  HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R, current*625); //Strom einstellen
-		  osDelay(4);
-	  }*/
+
+	  osDelay(2000);
+
+	  HAL_GPIO_WritePin(RED_GPIO_Port, RED_Pin, GPIO_PIN_RESET);
+	  osDelay(2000);
 
   }
   /* USER CODE END StartDefaultTask */
@@ -182,26 +177,88 @@ void StartBatteryTask(void *argument)
 	uint8_t regAddr = 0x00;
 	uint8_t readData[0x15] = {0};
 	HAL_StatusTypeDef status;
-	uint8_t writeData = 0b10000;
+	uint8_t writeData;
 
-	/*status = HAL_I2C_Mem_Write(&hi2c1, deviceAddress, 0x04, I2C_MEMADD_SIZE_8BIT, &writeData, 1, HAL_MAX_DELAY);
+	HAL_GPIO_WritePin(CHARGE_ENABLE_GPIO_Port, CHARGE_ENABLE_Pin, GPIO_PIN_SET);
+
+	writeData = 0b00111111; // disable ILIM pin, set max current to 3.25A
+	status = HAL_I2C_Mem_Write(&hi2c1, deviceAddress, 0x00, I2C_MEMADD_SIZE_8BIT, &writeData, 1, HAL_MAX_DELAY);
 	if (status == HAL_OK)
 	{
 
-	}*/
+	}
+
+	writeData = 0b11100000; //Start ADC_conversion
+	status = HAL_I2C_Mem_Write(&hi2c1, deviceAddress, 0x02, I2C_MEMADD_SIZE_8BIT, &writeData, 1, HAL_MAX_DELAY);
+	if (status == HAL_OK)
+	{
+
+	}
+
+	writeData = 0b00011010; //otg disable
+	status = HAL_I2C_Mem_Write(&hi2c1, deviceAddress, 0x03, I2C_MEMADD_SIZE_8BIT, &writeData, 1, HAL_MAX_DELAY);
+	if (status == HAL_OK)
+	{
+
+	}
 
 
-    status = HAL_I2C_Mem_Read(&hi2c1, deviceAddress, regAddr, I2C_MEMADD_SIZE_8BIT, readData, 0x15, HAL_MAX_DELAY);
+	writeData = 0b01001111; //fast charge current 5A
+	status = HAL_I2C_Mem_Write(&hi2c1, deviceAddress, 0x04, I2C_MEMADD_SIZE_8BIT, &writeData, 1, HAL_MAX_DELAY);
+	if (status == HAL_OK)
+	{
 
-    if (status == HAL_OK)
-    {
+	}
 
-    }
+	writeData = 0b10001101; //disable watchdog
+	status = HAL_I2C_Mem_Write(&hi2c1, deviceAddress, 0x07, I2C_MEMADD_SIZE_8BIT, &writeData, 1, HAL_MAX_DELAY);
+	if (status == HAL_OK)
+	{
+
+	}
+
+	HAL_GPIO_WritePin(CHARGE_ENABLE_GPIO_Port, CHARGE_ENABLE_Pin, GPIO_PIN_RESET);
 
 	for(;;)
 	{
-		osDelay(1);
+		status = HAL_I2C_Mem_Read(&hi2c1, deviceAddress, regAddr, I2C_MEMADD_SIZE_8BIT, readData, 0x15, HAL_MAX_DELAY);
+		if (status == HAL_OK)
+		{
+
+		}
+
+		enum Charging_Status
+		{
+			notCharge = 0,
+			preCharge = 1,
+			fastCharge = 2,
+			terminatedCharge = 3
+		};
+   	  	enum Charging_Status ChargingStatus = (readData[0x0B] & 0b00011000) >> 3;
+
+
+
+		switch(ChargingStatus)
+		{
+		case notCharge:
+			HAL_GPIO_WritePin(GREEN_GPIO_Port, GREEN_Pin, GPIO_PIN_RESET); 	//LED aus
+			break;
+		case preCharge:
+			HAL_GPIO_TogglePin(GREEN_GPIO_Port, GREEN_Pin);					//grün blinken
+			break;
+		case fastCharge:
+			HAL_GPIO_TogglePin(GREEN_GPIO_Port, GREEN_Pin);					//grün blinken
+			break;
+		case terminatedCharge:
+			HAL_GPIO_WritePin(GREEN_GPIO_Port, GREEN_Pin, GPIO_PIN_SET);	//LED ein
+			break;
+		default:
+			break;
+		}
+
+		osDelay(500);
 	}
+
 	/* USER CODE END StartBatteryTask */
 }
 
