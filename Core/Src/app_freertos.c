@@ -28,6 +28,7 @@
 #include "dac.h"
 #include "tim.h"
 #include "comp.h"
+#include "i2c.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -56,6 +57,13 @@ const osThreadAttr_t defaultTask_attributes = {
   .priority = (osPriority_t) osPriorityNormal,
   .stack_size = 128 * 4
 };
+/* Definitions for batteryTask */
+osThreadId_t batteryTaskHandle;
+const osThreadAttr_t batteryTask_attributes = {
+  .name = "batteryTask",
+  .priority = (osPriority_t) osPriorityLow,
+  .stack_size = 128 * 4
+};
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -63,6 +71,7 @@ const osThreadAttr_t defaultTask_attributes = {
 /* USER CODE END FunctionPrototypes */
 
 void StartDefaultTask(void *argument);
+void StartBatteryTask(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -96,6 +105,9 @@ void MX_FREERTOS_Init(void) {
   /* creation of defaultTask */
   defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
 
+  /* creation of batteryTask */
+  batteryTaskHandle = osThreadNew(StartBatteryTask, NULL, &batteryTask_attributes);
+
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
@@ -118,7 +130,7 @@ void StartDefaultTask(void *argument)
   /* USER CODE BEGIN StartDefaultTask */
 	HAL_DAC_Start(&hdac1, DAC_CHANNEL_2);
 	HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_2, DAC_ALIGN_12B_R, 0*312); //Spannung einstellen
-	HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R, 0*625); //Strom einstellen
+	HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R, 0.1*625); //Strom einstellen
 	HAL_DAC_Start(&hdac1, DAC_CHANNEL_1);
 
 
@@ -141,7 +153,7 @@ void StartDefaultTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-	  for(float current = 0.1; current < 0.5; current +=0.0005)
+/*	  for(float current = 0.1; current < 0.5; current +=0.0005)
 	  {
 		  HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R, current*625); //Strom einstellen
 		  osDelay(4);
@@ -150,10 +162,47 @@ void StartDefaultTask(void *argument)
 	  {
 		  HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R, current*625); //Strom einstellen
 		  osDelay(4);
-	  }
+	  }*/
 
   }
   /* USER CODE END StartDefaultTask */
+}
+
+/* USER CODE BEGIN Header_StartBatteryTask */
+/**
+* @brief Function implementing the batteryTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartBatteryTask */
+void StartBatteryTask(void *argument)
+{
+  /* USER CODE BEGIN StartBatteryTask */
+	uint8_t deviceAddress = 0x6A << 1;  // Shift for 7-bit address
+	uint8_t regAddr = 0x00;
+	uint8_t readData[0x15] = {0};
+	HAL_StatusTypeDef status;
+	uint8_t writeData = 0b10000;
+
+	/*status = HAL_I2C_Mem_Write(&hi2c1, deviceAddress, 0x04, I2C_MEMADD_SIZE_8BIT, &writeData, 1, HAL_MAX_DELAY);
+	if (status == HAL_OK)
+	{
+
+	}*/
+
+
+    status = HAL_I2C_Mem_Read(&hi2c1, deviceAddress, regAddr, I2C_MEMADD_SIZE_8BIT, readData, 0x15, HAL_MAX_DELAY);
+
+    if (status == HAL_OK)
+    {
+
+    }
+
+	for(;;)
+	{
+		osDelay(1);
+	}
+	/* USER CODE END StartBatteryTask */
 }
 
 /* Private application code --------------------------------------------------*/
