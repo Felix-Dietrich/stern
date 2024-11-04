@@ -180,17 +180,6 @@ void StartDefaultTask(void *argument)
 
 	HAL_GPIO_TogglePin(GREEN_GPIO_Port, GREEN_Pin);
 	//osDelay(200);
-	float voltage = 0;
-	for(; voltage < STAR_VOLTAGE_V; voltage +=0.05)
-	{
-		HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_2, DAC_ALIGN_12B_R, voltage*312);
-		osDelay(10);
-	}
-	for(; voltage > 0.05; voltage -=0.05)
-	{
-		HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_2, DAC_ALIGN_12B_R, voltage*312);
-		osDelay(10);
-	}
 
   /* Infinite loop */
   for(;;)
@@ -319,17 +308,27 @@ void StartCyclerTask(void *argument)
   /* USER CODE BEGIN StartCyclerTask */
 	HAL_ADC_ConfigChannel(&hadc1, ADC_CHANNEL_0_NUMBER);
 	HAL_ADC_Start(&hadc1);
+	float voltage = 0;
+
+	for(; voltage < STAR_VOLTAGE_V; voltage +=0.05) //test Star on startup
+	{
+		HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_2, DAC_ALIGN_12B_R, voltage*312);
+		osDelay(10);
+	}
+	for(; voltage > 0.05; voltage -=0.05)
+	{
+		HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_2, DAC_ALIGN_12B_R, voltage*312);
+		osDelay(10);
+	}
+
 
 	/* Infinite loop */
 	for(;;)
 	{/*
-		 * turn off when charging
-		 * turn completely off when dark for 5 days
+		 *
+		 * # todo turn completely off when dark for 5 days
 		 *
 		*/
-
-
-
 
 		while(brightness_lux > 100)
 		{
