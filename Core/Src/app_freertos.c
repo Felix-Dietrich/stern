@@ -62,6 +62,8 @@ enum Charging_Status
 			terminatedCharge = 3
 		};
 enum Charging_Status ChargingStatus = notCharge;
+
+float brightness_lux = 1000;
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
@@ -77,17 +79,17 @@ const osThreadAttr_t batteryTask_attributes = {
   .priority = (osPriority_t) osPriorityLow,
   .stack_size = 128 * 4
 };
-/* Definitions for I2CTask */
-osThreadId_t I2CTaskHandle;
-const osThreadAttr_t I2CTask_attributes = {
-  .name = "I2CTask",
-  .priority = (osPriority_t) osPriorityLow,
-  .stack_size = 128 * 4
-};
 /* Definitions for CyclerTask */
 osThreadId_t CyclerTaskHandle;
 const osThreadAttr_t CyclerTask_attributes = {
   .name = "CyclerTask",
+  .priority = (osPriority_t) osPriorityLow,
+  .stack_size = 128 * 4
+};
+/* Definitions for LuxTask */
+osThreadId_t LuxTaskHandle;
+const osThreadAttr_t LuxTask_attributes = {
+  .name = "LuxTask",
   .priority = (osPriority_t) osPriorityLow,
   .stack_size = 128 * 4
 };
@@ -99,8 +101,8 @@ const osThreadAttr_t CyclerTask_attributes = {
 
 void StartDefaultTask(void *argument);
 void StartBatteryTask(void *argument);
-void StartI2CTask(void *argument);
 void StartCyclerTask(void *argument);
+void StartLuxTask(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -137,11 +139,11 @@ void MX_FREERTOS_Init(void) {
   /* creation of batteryTask */
   batteryTaskHandle = osThreadNew(StartBatteryTask, NULL, &batteryTask_attributes);
 
-  /* creation of I2CTask */
-  I2CTaskHandle = osThreadNew(StartI2CTask, NULL, &I2CTask_attributes);
-
   /* creation of CyclerTask */
   CyclerTaskHandle = osThreadNew(StartCyclerTask, NULL, &CyclerTask_attributes);
+
+  /* creation of LuxTask */
+  LuxTaskHandle = osThreadNew(StartLuxTask, NULL, &LuxTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -305,24 +307,6 @@ void StartBatteryTask(void *argument)
   /* USER CODE END StartBatteryTask */
 }
 
-/* USER CODE BEGIN Header_StartI2CTask */
-/**
-* @brief Function implementing the I2CTask thread.
-* @param argument: Not used
-* @retval None
-*/
-/* USER CODE END Header_StartI2CTask */
-void StartI2CTask(void *argument)
-{
-  /* USER CODE BEGIN StartI2CTask */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
-  }
-  /* USER CODE END StartI2CTask */
-}
-
 /* USER CODE BEGIN Header_StartCyclerTask */
 /**
 * @brief Function implementing the CyclerTask thread.
@@ -345,24 +329,6 @@ void StartCyclerTask(void *argument)
 		*/
 
 
-
-
-		float gamma = 0.6;  //gamma value of ldr aout of datasheet
-		float r_10 = 14000; //ldr resistance at L0
-		float r15 = 10000; //pull up resistor used in circuit
-		float vref = 3.3; //reference voltage
-		float L_0 = 10;
-
-		float voltage = HAL_ADC_GetValue(&hadc1)*vref/(float)(1<<12);
-		if(vref - voltage > 0.01) //avoid division by zero
-		{
-			float r_ldr = r15 * (voltage / (vref - voltage));
-			float brightness_lux = L_0 * pow(r_ldr/r_10,-1.0/gamma);
-		}
-		else
-		{
-			brightness_lux = 0;
-		}
 
 
 		while(brightness_lux > 100)
@@ -392,7 +358,7 @@ void StartCyclerTask(void *argument)
 			osDelay(30);
 		}
 
-		int elapsedTime_s = 0;
+		elapsedTime_s = 0;
 		while(brightness_lux < 100)
 		{
 			osDelay(1000);
@@ -412,6 +378,40 @@ void StartCyclerTask(void *argument)
 
 	}
   /* USER CODE END StartCyclerTask */
+}
+
+/* USER CODE BEGIN Header_StartLuxTask */
+/**
+* @brief Function implementing the LuxTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartLuxTask */
+void StartLuxTask(void *argument)
+{
+	/* USER CODE BEGIN StartLuxTask */
+	/* Infinite loop */
+	for(;;)
+	{
+		float gamma = 0.6;  //gamma value of ldr aout of datasheet
+		float r_10 = 14000; //ldr resistance at L0
+		float r15 = 10000; //pull up resistor used in circuit
+		float vref = 3.3; //reference voltage
+		float L_0 = 10;
+
+		float voltage = HAL_ADC_GetValue(&hadc1)*vref/(float)(1<<12);
+		if(vref - voltage > 0.01) //avoid division by zero
+		{
+			float r_ldr = r15 * (voltage / (vref - voltage));
+			brightness_lux = L_0 * pow(r_ldr/r_10,-1.0/gamma);
+		}
+		else
+		{
+			brightness_lux = 0;
+		}
+		osDelay(1000);
+	}
+	/* USER CODE END StartLuxTask */
 }
 
 /* Private application code --------------------------------------------------*/
