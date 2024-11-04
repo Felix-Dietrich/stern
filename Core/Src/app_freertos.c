@@ -167,7 +167,7 @@ void StartDefaultTask(void *argument)
   /* USER CODE BEGIN StartDefaultTask */
 	HAL_DAC_Start(&hdac1, DAC_CHANNEL_2);
 	HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_2, DAC_ALIGN_12B_R, 0*312); //Spannung einstellen
-	HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R, 0.1*625); //Strom einstellen
+	HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R, 0*625); //Strom einstellen
 	HAL_DAC_Start(&hdac1, DAC_CHANNEL_1);
 
 
@@ -253,13 +253,6 @@ void StartBatteryTask(void *argument)
 
 		}
 
-		enum Charging_Status
-		{
-			notCharge = 0,
-			preCharge = 1,
-			fastCharge = 2,
-			terminatedCharge = 3
-		};
    	  	ChargingStatus = (readData[0x0B] & 0b00011000) >> 3;
 
 		switch(ChargingStatus)
@@ -281,13 +274,18 @@ void StartBatteryTask(void *argument)
 		}
 
 		uint16_t BatteryVoltage_mV = ((readData[0x0E]& 0b01111111)*20)+2304;
-		if(BatteryVoltage_mV > 3500)
+		if(BatteryVoltage_mV > 3700)
+		{
+			HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R, STAR_CURRENT_A*625); //Strom einstellen
+		}
+		else if(BatteryVoltage_mV > 3500)
 		{
 			HAL_GPIO_WritePin(RED_GPIO_Port, RED_Pin, GPIO_PIN_RESET); 	//LED aus
 		}
 		else
 		{
 			HAL_GPIO_TogglePin(RED_GPIO_Port, RED_Pin); 				//rot blinken
+			HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R, (STAR_CURRENT_A/4)*625);
 		}
 
 		osDelay(500);
@@ -351,7 +349,7 @@ void StartCyclerTask(void *argument)
 			elapsedTime_s ++;
 		}
 
-		for(float voltage = 0; voltage > 0.05; voltage -=0.05) //turn star off softly
+		for(float voltage = STAR_VOLTAGE_V; voltage > 0.05; voltage -=0.05) //turn star off softly
 		{
 			HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_2, DAC_ALIGN_12B_R, voltage*312);
 			osDelay(30);
