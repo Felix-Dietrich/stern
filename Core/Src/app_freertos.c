@@ -29,6 +29,8 @@
 #include "tim.h"
 #include "comp.h"
 #include "i2c.h"
+#include "adc.h"
+#include "math.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -38,7 +40,11 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define STAR_VOLTAGE_V 12
+#define STAR_CURRENT_A 0.1
+#define STAR_ON_TIME_H 5
+#define STAR_MINIMUM_OFF_TIME_H 0
+#define STAR_TURN_ON_THRESHOLD_LUX 100
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -48,7 +54,14 @@
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN Variables */
-
+enum Charging_Status
+		{
+			notCharge = 0,
+			preCharge = 1,
+			fastCharge = 2,
+			terminatedCharge = 3
+		};
+enum Charging_Status ChargingStatus = notCharge;
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
@@ -64,6 +77,20 @@ const osThreadAttr_t batteryTask_attributes = {
   .priority = (osPriority_t) osPriorityLow,
   .stack_size = 128 * 4
 };
+/* Definitions for I2CTask */
+osThreadId_t I2CTaskHandle;
+const osThreadAttr_t I2CTask_attributes = {
+  .name = "I2CTask",
+  .priority = (osPriority_t) osPriorityLow,
+  .stack_size = 128 * 4
+};
+/* Definitions for CyclerTask */
+osThreadId_t CyclerTaskHandle;
+const osThreadAttr_t CyclerTask_attributes = {
+  .name = "CyclerTask",
+  .priority = (osPriority_t) osPriorityLow,
+  .stack_size = 128 * 4
+};
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -72,6 +99,8 @@ const osThreadAttr_t batteryTask_attributes = {
 
 void StartDefaultTask(void *argument);
 void StartBatteryTask(void *argument);
+void StartI2CTask(void *argument);
+void StartCyclerTask(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -108,6 +137,12 @@ void MX_FREERTOS_Init(void) {
   /* creation of batteryTask */
   batteryTaskHandle = osThreadNew(StartBatteryTask, NULL, &batteryTask_attributes);
 
+  /* creation of I2CTask */
+  I2CTaskHandle = osThreadNew(StartI2CTask, NULL, &I2CTask_attributes);
+
+  /* creation of CyclerTask */
+  CyclerTaskHandle = osThreadNew(StartCyclerTask, NULL, &CyclerTask_attributes);
+
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
@@ -143,22 +178,22 @@ void StartDefaultTask(void *argument)
 
 	HAL_GPIO_TogglePin(GREEN_GPIO_Port, GREEN_Pin);
 	//osDelay(200);
-
-	for(float voltage = 0; voltage < 12; voltage +=0.05)
+	float voltage = 0;
+	for(; voltage < STAR_VOLTAGE_V; voltage +=0.05)
 	{
 		HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_2, DAC_ALIGN_12B_R, voltage*312);
-		osDelay(1);
+		osDelay(10);
+	}
+	for(; voltage > 0.05; voltage -=0.05)
+	{
+		HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_2, DAC_ALIGN_12B_R, voltage*312);
+		osDelay(10);
 	}
 
   /* Infinite loop */
   for(;;)
   {
-
 	  osDelay(2000);
-
-	  HAL_GPIO_WritePin(RED_GPIO_Port, RED_Pin, GPIO_PIN_RESET);
-	  osDelay(2000);
-
   }
   /* USER CODE END StartDefaultTask */
 }
@@ -234,9 +269,7 @@ void StartBatteryTask(void *argument)
 			fastCharge = 2,
 			terminatedCharge = 3
 		};
-   	  	enum Charging_Status ChargingStatus = (readData[0x0B] & 0b00011000) >> 3;
-
-
+   	  	ChargingStatus = (readData[0x0B] & 0b00011000) >> 3;
 
 		switch(ChargingStatus)
 		{
@@ -256,10 +289,129 @@ void StartBatteryTask(void *argument)
 			break;
 		}
 
+		uint16_t BatteryVoltage_mV = ((readData[0x0E]& 0b01111111)*20)+2304;
+		if(BatteryVoltage_mV > 3500)
+		{
+			HAL_GPIO_WritePin(RED_GPIO_Port, RED_Pin, GPIO_PIN_RESET); 	//LED aus
+		}
+		else
+		{
+			HAL_GPIO_TogglePin(RED_GPIO_Port, RED_Pin); 				//rot blinken
+		}
+
 		osDelay(500);
 	}
 
-	/* USER CODE END StartBatteryTask */
+  /* USER CODE END StartBatteryTask */
+}
+
+/* USER CODE BEGIN Header_StartI2CTask */
+/**
+* @brief Function implementing the I2CTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartI2CTask */
+void StartI2CTask(void *argument)
+{
+  /* USER CODE BEGIN StartI2CTask */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END StartI2CTask */
+}
+
+/* USER CODE BEGIN Header_StartCyclerTask */
+/**
+* @brief Function implementing the CyclerTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartCyclerTask */
+void StartCyclerTask(void *argument)
+{
+  /* USER CODE BEGIN StartCyclerTask */
+	HAL_ADC_ConfigChannel(&hadc1, ADC_CHANNEL_0_NUMBER);
+	HAL_ADC_Start(&hadc1);
+
+	/* Infinite loop */
+	for(;;)
+	{/*
+		 * turn off when charging
+		 * turn completely off when dark for 5 days
+		 *
+		*/
+
+
+
+
+		float gamma = 0.6;  //gamma value of ldr aout of datasheet
+		float r_10 = 14000; //ldr resistance at L0
+		float r15 = 10000; //pull up resistor used in circuit
+		float vref = 3.3; //reference voltage
+		float L_0 = 10;
+
+		float voltage = HAL_ADC_GetValue(&hadc1)*vref/(float)(1<<12);
+		if(vref - voltage > 0.01) //avoid division by zero
+		{
+			float r_ldr = r15 * (voltage / (vref - voltage));
+			float brightness_lux = L_0 * pow(r_ldr/r_10,-1.0/gamma);
+		}
+		else
+		{
+			brightness_lux = 0;
+		}
+
+
+		while(brightness_lux > 100)
+		{
+			osDelay(1000);
+		}
+		for(float voltage = 0; voltage < STAR_VOLTAGE_V; voltage +=0.05) //turn star on softly
+		{
+			HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_2, DAC_ALIGN_12B_R, voltage*312);
+			osDelay(30);
+		}
+
+		int elapsedTime_s = 0;
+		while(elapsedTime_s < (STAR_ON_TIME_H*60*60))
+		{
+			osDelay(1000);
+			if(ChargingStatus != notCharge)
+			{
+				break;
+			}
+			elapsedTime_s ++;
+		}
+
+		for(float voltage = 0; voltage > 0.05; voltage -=0.05) //turn star off softly
+		{
+			HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_2, DAC_ALIGN_12B_R, voltage*312);
+			osDelay(30);
+		}
+
+		int elapsedTime_s = 0;
+		while(brightness_lux < 100)
+		{
+			osDelay(1000);
+			elapsedTime_s++;
+			if(elapsedTime_s > 60*60*24*5)
+			{
+				//turn off completely to save battery
+			}
+		}
+
+		while(elapsedTime_s < (STAR_MINIMUM_OFF_TIME_H*60*60))
+		{
+			osDelay(1000);
+			elapsedTime_s++;
+		}
+
+
+	}
+  /* USER CODE END StartCyclerTask */
 }
 
 /* Private application code --------------------------------------------------*/
