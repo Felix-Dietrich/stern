@@ -204,6 +204,7 @@ void StartBatteryTask(void *argument)
 	uint8_t readData[0x15] = {0};
 	HAL_StatusTypeDef status;
 	uint8_t writeData;
+	uint8_t lowBattery = 0;
 
 	HAL_GPIO_WritePin(CHARGE_ENABLE_GPIO_Port, CHARGE_ENABLE_Pin, GPIO_PIN_SET);
 
@@ -276,16 +277,24 @@ void StartBatteryTask(void *argument)
 		uint16_t BatteryVoltage_mV = ((readData[0x0E]& 0b01111111)*20)+2304;
 		if(BatteryVoltage_mV > 3700)
 		{
-			HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R, STAR_CURRENT_A*625); //Strom einstellen
+			lowBattery = 0;
+
 		}
-		else if(BatteryVoltage_mV > 3500)
+		else if(BatteryVoltage_mV < 3500)
 		{
-			HAL_GPIO_WritePin(RED_GPIO_Port, RED_Pin, GPIO_PIN_RESET); 	//LED aus
+			lowBattery = 1;
+
 		}
-		else
+
+		if(lowBattery)
 		{
 			HAL_GPIO_TogglePin(RED_GPIO_Port, RED_Pin); 				//rot blinken
 			HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R, (STAR_CURRENT_A/4)*625);
+		}
+		else
+		{
+			HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R, STAR_CURRENT_A*625); //Strom einstellen
+			HAL_GPIO_WritePin(RED_GPIO_Port, RED_Pin, GPIO_PIN_RESET); 	//LED aus
 		}
 
 		osDelay(500);
@@ -325,7 +334,7 @@ void StartCyclerTask(void *argument)
 	{/*
 		 *
 		 * # todo turn completely off when dark for 5 days
-		 *
+		 * # todo detect plug in of the Star and turn then on when dark
 		*/
 
 		while(brightness_lux > 100)
@@ -364,6 +373,10 @@ void StartCyclerTask(void *argument)
 			{
 				//turn off completely to save battery
 			}
+			/*if(ChargingStatus != notCharge)
+			{
+				break;
+			}*/
 		}
 
 		while(elapsedTime_s < (STAR_MINIMUM_OFF_TIME_H*60*60))
@@ -397,7 +410,7 @@ void StartLuxTask(void *argument)
 		float L_0 = 10;
 
 		float voltage = HAL_ADC_GetValue(&hadc1)*vref/(float)(1<<12);
-		if(vref - voltage > 0.01) //avoid division by zero
+		if(vref - voltage > 0.005) //avoid division by zero
 		{
 			float r_ldr = r15 * (voltage / (vref - voltage));
 			brightness_lux = L_0 * pow(r_ldr/r_10,-1.0/gamma);
