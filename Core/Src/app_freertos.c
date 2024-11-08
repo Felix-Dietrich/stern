@@ -432,7 +432,7 @@ void StartCyclerTask(void *argument)
 
 /* USER CODE BEGIN Header_StartLuxTask */
 /**
-* @brief Function implementing the LuxTask thread.
+* @brief Measures brightenss and calculates a moving average of the brightness over a minute.
 * @param argument: Not used
 * @retval None
 */
@@ -443,22 +443,33 @@ void StartLuxTask(void *argument)
 	/* Infinite loop */
 	for(;;)
 	{
-		float gamma = 0.6;  //gamma value of ldr aout of datasheet
-		float r_10 = 14000; //ldr resistance at L0
-		float r15 = 10000; //pull up resistor used in circuit
-		float vref = 3.3; //reference voltage
-		float L_0 = 10;
+		static int second = 0;
+		const float gamma = 0.6;  //gamma value of ldr aout of datasheet
+		const float r_10 = 14000; //ldr resistance at L0
+		const float r15 = 10000; //pull up resistor used in circuit
+		const float vref = 3.3; //reference voltage
+		const float L_0 = 10;
+		float currentBrightness_lux = 0;
+		static float brightnessValues_lux[60];
 
 		float voltage = HAL_ADC_GetValue(&hadc1)*vref/(float)(1<<12);
 		if(vref - voltage > 0.005) //avoid division by zero
 		{
 			float r_ldr = r15 * (voltage / (vref - voltage));
-			brightness_lux = L_0 * pow(r_ldr/r_10,-1.0/gamma);
+			currentBrightness_lux = L_0 * pow(r_ldr/r_10,-1.0/gamma);
 		}
-		else
+		brightnessValues_lux[second] = currentBrightness_lux;
+		second++;
+		if(second >=60)
 		{
-			brightness_lux = 0;
+			second = 0;
 		}
+		float brightnessSum_lux = 0;
+		for(int i = 0; i < 60; i++)
+		{
+			brightnessSum_lux += brightnessValues_lux[i];
+		}
+		brightness_lux = brightnessSum_lux/60;
 		osDelay(1000);
 	}
 	/* USER CODE END StartLuxTask */
