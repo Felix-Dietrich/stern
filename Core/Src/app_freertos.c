@@ -31,6 +31,7 @@
 #include "i2c.h"
 #include "adc.h"
 #include "math.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -63,46 +64,24 @@ enum Charging_Status
 		};
 enum Charging_Status ChargingStatus = notCharge;
 
+uint8_t request_poweroff = 0;
+
 float brightness_lux = 1000;
 /* USER CODE END Variables */
-/* Definitions for defaultTask */
-osThreadId_t defaultTaskHandle;
-const osThreadAttr_t defaultTask_attributes = {
-  .name = "defaultTask",
-  .priority = (osPriority_t) osPriorityNormal,
-  .stack_size = 128 * 4
-};
-/* Definitions for batteryTask */
-osThreadId_t batteryTaskHandle;
-const osThreadAttr_t batteryTask_attributes = {
-  .name = "batteryTask",
-  .priority = (osPriority_t) osPriorityLow,
-  .stack_size = 128 * 4
-};
-/* Definitions for CyclerTask */
-osThreadId_t CyclerTaskHandle;
-const osThreadAttr_t CyclerTask_attributes = {
-  .name = "CyclerTask",
-  .priority = (osPriority_t) osPriorityLow,
-  .stack_size = 128 * 4
-};
-/* Definitions for LuxTask */
-osThreadId_t LuxTaskHandle;
-const osThreadAttr_t LuxTask_attributes = {
-  .name = "LuxTask",
-  .priority = (osPriority_t) osPriorityLow,
-  .stack_size = 128 * 4
-};
+osThreadId defaultTaskHandle;
+osThreadId batteryTaskHandle;
+osThreadId CyclerTaskHandle;
+osThreadId LuxTaskHandle;
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
 
 /* USER CODE END FunctionPrototypes */
 
-void StartDefaultTask(void *argument);
-void StartBatteryTask(void *argument);
-void StartCyclerTask(void *argument);
-void StartLuxTask(void *argument);
+void StartDefaultTask(void const * argument);
+void StartBatteryTask(void const * argument);
+void StartCyclerTask(void const * argument);
+void StartLuxTask(void const * argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -133,25 +112,25 @@ void MX_FREERTOS_Init(void) {
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
-  /* creation of defaultTask */
-  defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
+  /* definition and creation of defaultTask */
+  osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 128);
+  defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
 
-  /* creation of batteryTask */
-  batteryTaskHandle = osThreadNew(StartBatteryTask, NULL, &batteryTask_attributes);
+  /* definition and creation of batteryTask */
+  osThreadDef(batteryTask, StartBatteryTask, osPriorityLow, 0, 128);
+  batteryTaskHandle = osThreadCreate(osThread(batteryTask), NULL);
 
-  /* creation of CyclerTask */
-  CyclerTaskHandle = osThreadNew(StartCyclerTask, NULL, &CyclerTask_attributes);
+  /* definition and creation of CyclerTask */
+  osThreadDef(CyclerTask, StartCyclerTask, osPriorityLow, 0, 128);
+  CyclerTaskHandle = osThreadCreate(osThread(CyclerTask), NULL);
 
-  /* creation of LuxTask */
-  LuxTaskHandle = osThreadNew(StartLuxTask, NULL, &LuxTask_attributes);
+  /* definition and creation of LuxTask */
+  osThreadDef(LuxTask, StartLuxTask, osPriorityLow, 0, 128);
+  LuxTaskHandle = osThreadCreate(osThread(LuxTask), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
-
-  /* USER CODE BEGIN RTOS_EVENTS */
-  /* add events, ... */
-  /* USER CODE END RTOS_EVENTS */
 
 }
 
@@ -162,7 +141,7 @@ void MX_FREERTOS_Init(void) {
   * @retval None
   */
 /* USER CODE END Header_StartDefaultTask */
-void StartDefaultTask(void *argument)
+void StartDefaultTask(void const * argument)
 {
   /* USER CODE BEGIN StartDefaultTask */
 	HAL_DAC_Start(&hdac1, DAC_CHANNEL_2);
@@ -175,17 +154,17 @@ void StartDefaultTask(void *argument)
 	HAL_COMP_Start(&hcomp2);
 	HAL_TIM_PWM_Start(&htim1, HAL_TIM_ACTIVE_CHANNEL_2);
 	HAL_TIM_PWM_Start(&htim1, HAL_TIM_ACTIVE_CHANNEL_3);
-	__HAL_TIM_SET_COMPARE(&htim1,HAL_TIM_ACTIVE_CHANNEL_2,120);
-	__HAL_TIM_SET_COMPARE(&htim1,HAL_TIM_ACTIVE_CHANNEL_3,120);
+	__HAL_TIM_SET_COMPARE(&htim1,HAL_TIM_ACTIVE_CHANNEL_2,11);
+	__HAL_TIM_SET_COMPARE(&htim1,HAL_TIM_ACTIVE_CHANNEL_3,11);
 
 	HAL_GPIO_TogglePin(GREEN_GPIO_Port, GREEN_Pin);
 	//osDelay(200);
 
-  /* Infinite loop */
-  for(;;)
-  {
-	  osDelay(2000);
-  }
+	/* Infinite loop */
+	for(;;)
+	{
+		osDelay(2000);
+	}
   /* USER CODE END StartDefaultTask */
 }
 
@@ -196,7 +175,7 @@ void StartDefaultTask(void *argument)
 * @retval None
 */
 /* USER CODE END Header_StartBatteryTask */
-void StartBatteryTask(void *argument)
+void StartBatteryTask(void const * argument)
 {
   /* USER CODE BEGIN StartBatteryTask */
 	uint8_t deviceAddress = 0x6A << 1;  // Shift for 7-bit address
@@ -248,11 +227,15 @@ void StartBatteryTask(void *argument)
 
 	for(;;)
 	{
-		status = HAL_I2C_Mem_Read(&hi2c1, deviceAddress, regAddr, I2C_MEMADD_SIZE_8BIT, readData, 0x15, HAL_MAX_DELAY);
-		if (status == HAL_OK)
-		{
 
+		if(request_poweroff)
+		{
+			request_poweroff = 0;
+			writeData = 0b01100100;  //force batfet off without delay
+			HAL_I2C_Mem_Write(&hi2c1, deviceAddress, 0x09, I2C_MEMADD_SIZE_8BIT, &writeData, 1, HAL_MAX_DELAY);
 		}
+
+		status = HAL_I2C_Mem_Read(&hi2c1, deviceAddress, regAddr, I2C_MEMADD_SIZE_8BIT, readData, 0x15, HAL_MAX_DELAY);
 
    	  	ChargingStatus = (readData[0x0B] & 0b00011000) >> 3;
 
@@ -273,7 +256,8 @@ void StartBatteryTask(void *argument)
 		default:
 			break;
 		}
-
+		uint16_t VBUS_mV = 2600 + (readData[0x11]&0b01111111)*100;
+		uint16_t ChargingCurrent_mA = readData[0x12]*50;
 		uint16_t BatteryVoltage_mV = ((readData[0x0E]& 0b01111111)*20)+2304;
 		if(BatteryVoltage_mV > 3700)
 		{
@@ -310,7 +294,7 @@ void StartBatteryTask(void *argument)
 * @retval None
 */
 /* USER CODE END Header_StartCyclerTask */
-void StartCyclerTask(void *argument)
+void StartCyclerTask(void const * argument)
 {
   /* USER CODE BEGIN StartCyclerTask */
 	HAL_ADC_ConfigChannel(&hadc1, ADC_CHANNEL_0_NUMBER);
@@ -348,6 +332,7 @@ void StartCyclerTask(void *argument)
 		static enum Status status = OFF_DAY;
 		static float voltage_V = 0;
 		static uint32_t ontime_ms  = 0;
+		static uint32_t offtime_ms = 0;
 
 		switch(status)
 		{
@@ -359,6 +344,7 @@ void StartCyclerTask(void *argument)
 					HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_2, DAC_ALIGN_12B_R, (uint32_t)(voltage_V*312));
 				}
 				ontime_ms+=10;
+				offtime_ms = 0;
 
 				//next state logic
 				//--------------------------
@@ -423,6 +409,13 @@ void StartCyclerTask(void *argument)
 			status = OFF_DAY;
 		}
 		lastChargingStatus = ChargingStatus;
+
+		offtime_ms+=10;
+		if(offtime_ms >= 1000*60*60*24*5)
+		{
+			offtime_ms = 0;
+			request_poweroff = 1;
+		}
 		osDelay(10);
 
 
@@ -437,9 +430,9 @@ void StartCyclerTask(void *argument)
 * @retval None
 */
 /* USER CODE END Header_StartLuxTask */
-void StartLuxTask(void *argument)
+void StartLuxTask(void const * argument)
 {
-	/* USER CODE BEGIN StartLuxTask */
+  /* USER CODE BEGIN StartLuxTask */
 	/* Infinite loop */
 	for(;;)
 	{
@@ -472,7 +465,7 @@ void StartLuxTask(void *argument)
 		brightness_lux = brightnessSum_lux/60;
 		osDelay(1000);
 	}
-	/* USER CODE END StartLuxTask */
+  /* USER CODE END StartLuxTask */
 }
 
 /* Private application code --------------------------------------------------*/
