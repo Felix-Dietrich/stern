@@ -43,8 +43,8 @@
 #define STAR_VOLTAGE_V 12
 #define STAR_CURRENT_A 0.1
 #define STAR_ON_TIME_H 5
-#define STAR_MINIMUM_OFF_TIME_H 0
 #define STAR_TURN_ON_THRESHOLD_LUX 100
+#define STAR_MINIMUM_DAY_BRIGHTNESS_LUX 500
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -335,55 +335,95 @@ void StartCyclerTask(void *argument)
 		 *
 		 * # todo turn completely off when dark for 5 days
 		 * # todo detect plug in of the Star and turn then on when dark
+		 * # todo turn off when brighter than 500 lux
 		*/
 
-		while(brightness_lux > 100)
+		enum Status
 		{
-			osDelay(1000);
-		}
-		for(float voltage = 0; voltage < STAR_VOLTAGE_V; voltage +=0.05) //turn star on softly
-		{
-			HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_2, DAC_ALIGN_12B_R, voltage*312);
-			osDelay(30);
-		}
+			ON,
+			TURN_OFF,
+			OFF_NIGHT,
+			OFF_DAY
+		};
+		static enum Status status = OFF_DAY;
+		static float voltage_V = 0;
+		static uint32_t ontime_ms  = 0;
 
-		int elapsedTime_s = 0;
-		while(elapsedTime_s < (STAR_ON_TIME_H*60*60))
+		switch(status)
 		{
-			osDelay(1000);
-			if(ChargingStatus != notCharge)
+			case ON:
 			{
+				if(voltage_V < STAR_VOLTAGE_V)
+				{
+					voltage_V+= 0.02;
+					HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_2, DAC_ALIGN_12B_R, (uint32_t)(voltage_V*312));
+				}
+				ontime_ms+=10;
+
+				//next state logic
+				//--------------------------
+				if(ontime_ms >= (STAR_ON_TIME_H*60*60*1000))
+				{
+					status = TURN_OFF;
+				}
+				if(brightness_lux > STAR_MINIMUM_DAY_BRIGHTNESS_LUX)
+				{
+					status = TURN_OFF;
+				}
+
 				break;
 			}
-			elapsedTime_s ++;
-		}
-
-		for(float voltage = STAR_VOLTAGE_V; voltage > 0.05; voltage -=0.05) //turn star off softly
-		{
-			HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_2, DAC_ALIGN_12B_R, voltage*312);
-			osDelay(30);
-		}
-
-		elapsedTime_s = 0;
-		while(brightness_lux < 100)
-		{
-			osDelay(1000);
-			elapsedTime_s++;
-			if(elapsedTime_s > 60*60*24*5)
+			case TURN_OFF:
 			{
-				//turn off completely to save battery
-			}
-			/*if(ChargingStatus != notCharge)
-			{
+				if(voltage_V >= 0.02)
+				{
+					voltage_V-= 0.02;
+					HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_2, DAC_ALIGN_12B_R, (uint32_t)(voltage_V*312));
+				}
+				else
+				{
+					//next state logic
+					//--------------------------
+					status = OFF_NIGHT;
+
+				}
+
 				break;
-			}*/
-		}
+			}
+			case OFF_NIGHT:
+			{
+				//next state logic
+				//--------------------------
+				if(brightness_lux > STAR_MINIMUM_DAY_BRIGHTNESS_LUX)
+				{
+					status = OFF_DAY;
+				}
+				break;
+			}
+			case OFF_DAY:
+			{
 
-		while(elapsedTime_s < (STAR_MINIMUM_OFF_TIME_H*60*60))
-		{
-			osDelay(1000);
-			elapsedTime_s++;
+				//next state logic
+				//--------------------------
+				if(brightness_lux < STAR_TURN_ON_THRESHOLD_LUX)
+				{
+					ontime_ms  = 0;
+					status = ON;
+				}
+				break;
+			}
 		}
+		static enum Charging_Status lastChargingStatus;
+		if((ChargingStatus != notCharge) && (lastChargingStatus == notCharge)) //eingesteckt zum laden
+		{
+			status = TURN_OFF;
+		}
+		if((ChargingStatus == notCharge) && (lastChargingStatus != notCharge)) //ausgesteckt vom Laden
+		{
+			status = OFF_DAY;
+		}
+		lastChargingStatus = ChargingStatus;
+		osDelay(10);
 
 
 	}
