@@ -450,7 +450,7 @@ void StartLuxTask(void *argument)
 		const float vref = 3.3; //reference voltage
 		const float L_0 = 10;
 		float currentBrightness_lux = 0;
-		static float brightnessValues_lux[60];
+		static float brightnessValues_lux[60] = {0};
 
 		float voltage = HAL_ADC_GetValue(&hadc1)*vref/(float)(1<<12);
 		if(vref - voltage > 0.005) //avoid division by zero
