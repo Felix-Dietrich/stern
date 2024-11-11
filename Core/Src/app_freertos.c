@@ -223,6 +223,13 @@ void StartBatteryTask(void const * argument)
 
 	}
 
+	writeData = 0b10010011; //40mOhm IR compensation
+	status = HAL_I2C_Mem_Write(&hi2c1, deviceAddress, 0x08, I2C_MEMADD_SIZE_8BIT, &writeData, 1, HAL_MAX_DELAY);
+	if (status == HAL_OK)
+	{
+
+	}
+
 	HAL_GPIO_WritePin(CHARGE_ENABLE_GPIO_Port, CHARGE_ENABLE_Pin, GPIO_PIN_RESET);
 
 	for(;;)
