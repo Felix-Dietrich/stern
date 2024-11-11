@@ -322,13 +322,7 @@ void StartCyclerTask(void const * argument)
 
 	/* Infinite loop */
 	for(;;)
-	{/*
-		 *
-		 * # todo turn completely off when dark for 5 days
-		 * # todo detect plug in of the Star and turn then on when dark
-		 * # todo turn off when brighter than 500 lux
-		*/
-
+	{
 		enum Status
 		{
 			ON,
