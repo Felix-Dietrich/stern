@@ -66,7 +66,7 @@ enum Charging_Status ChargingStatus = notCharge;
 
 uint8_t request_poweroff = 0;
 
-float brightness_lux = 1000;
+float brightness_lux = 0;
 /* USER CODE END Variables */
 osThreadId defaultTaskHandle;
 osThreadId batteryTaskHandle;
@@ -154,8 +154,8 @@ void StartDefaultTask(void const * argument)
 	HAL_COMP_Start(&hcomp2);
 	HAL_TIM_PWM_Start(&htim1, HAL_TIM_ACTIVE_CHANNEL_2);
 	HAL_TIM_PWM_Start(&htim1, HAL_TIM_ACTIVE_CHANNEL_3);
-	__HAL_TIM_SET_COMPARE(&htim1,HAL_TIM_ACTIVE_CHANNEL_2,11);
-	__HAL_TIM_SET_COMPARE(&htim1,HAL_TIM_ACTIVE_CHANNEL_3,11);
+	__HAL_TIM_SET_COMPARE(&htim1,HAL_TIM_ACTIVE_CHANNEL_2,6);
+	__HAL_TIM_SET_COMPARE(&htim1,HAL_TIM_ACTIVE_CHANNEL_3,6);
 
 	HAL_GPIO_TogglePin(GREEN_GPIO_Port, GREEN_Pin);
 	//osDelay(200);
@@ -263,8 +263,8 @@ void StartBatteryTask(void const * argument)
 		default:
 			break;
 		}
-		uint16_t VBUS_mV = 2600 + (readData[0x11]&0b01111111)*100;
-		uint16_t ChargingCurrent_mA = readData[0x12]*50;
+		//uint16_t VBUS_mV = 2600 + (readData[0x11]&0b01111111)*100;
+		//uint16_t ChargingCurrent_mA = readData[0x12]*50;
 		uint16_t BatteryVoltage_mV = ((readData[0x0E]& 0b01111111)*20)+2304;
 		if(BatteryVoltage_mV > 3700)
 		{
@@ -336,7 +336,7 @@ void StartCyclerTask(void const * argument)
 			OFF_NIGHT,
 			OFF_DAY
 		};
-		static enum Status status = OFF_DAY;
+		static enum Status status = ON;
 		static float voltage_V = 0;
 		static uint32_t ontime_ms  = 0;
 		static uint32_t offtime_ms = 0;
@@ -441,8 +441,10 @@ void StartLuxTask(void const * argument)
 {
   /* USER CODE BEGIN StartLuxTask */
 	/* Infinite loop */
+	HAL_ADC_GetValue(&hadc1);
 	for(;;)
 	{
+		osDelay(1000);
 		static int second = 0;
 		const float gamma = 0.6;  //gamma value of ldr aout of datasheet
 		const float r_10 = 14000; //ldr resistance at L0
@@ -450,7 +452,7 @@ void StartLuxTask(void const * argument)
 		const float vref = 3.3; //reference voltage
 		const float L_0 = 10;
 		float currentBrightness_lux = 0;
-		static float brightnessValues_lux[60] = {0};
+		static float brightnessValues_lux[60] = {0.00};
 
 		float voltage = HAL_ADC_GetValue(&hadc1)*vref/(float)(1<<12);
 		if(vref - voltage > 0.005) //avoid division by zero
@@ -470,7 +472,7 @@ void StartLuxTask(void const * argument)
 			brightnessSum_lux += brightnessValues_lux[i];
 		}
 		brightness_lux = brightnessSum_lux/60;
-		osDelay(1000);
+
 	}
   /* USER CODE END StartLuxTask */
 }
